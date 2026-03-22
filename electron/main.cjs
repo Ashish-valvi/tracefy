@@ -1,25 +1,19 @@
-const { app, BrowserWindow , Menu } = require("electron");
-const path = require("path");
+const { app , Menu } = require("electron");
+const createWindow = require("./windows/createWindow.cjs");
+const registerDBHandlers = require("./ipc/dbHandlers.cjs");
+const registerFileHandlers = require("./ipc/fileHandlers.cjs");
+const registerCSVHandlers = require("./ipc/csvHandlers.cjs");
 
-const isDev = process.env.NODE_ENV === "development";
 
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1000,
-    height: 700,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"), // 👈 update here
-    },
-  });
-
-  if (isDev) {
-    win.loadURL("http://localhost:5173");
-  } else {
-    win.loadFile(path.join(__dirname, "../dist/index.html"));
-  }
-}
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null); 
   createWindow();
+
+  // -------------------IPC
+    // Register all IPC handlers
+  registerDBHandlers();
+  registerFileHandlers();
+  registerCSVHandlers();
 });
+

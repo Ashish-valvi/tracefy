@@ -1,51 +1,64 @@
 import { useEffect, useState } from "react";
 
-function TableSelector() {
+function TableSelector({ setSelectedTable, setLoadTable }) {
   const [tables, setTables] = useState([]);
-  const [selectedTable, setSelectedTable] = useState("");
+  const [selectedTableLocal, setSelectedTableLocal] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  // Fetch tables from backend
   useEffect(() => {
     const fetchTables = async () => {
-      const result = await window.api.getTables();
-      setTables(result);
+      try {
+        setLoading(true);
+        const result = await window.api.getTables();
+        setTables(result || []);
+      } catch (error) {
+        console.error("❌ Error fetching tables:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchTables();
   }, []);
 
-  const handleClick = () => {
-    if (!selectedTable) {
-      console.log("⚠️ Please select a table first");
+  // Load button click
+  const handleLoad = () => {
+    if (!selectedTableLocal) {
+      alert("⚠️ Please select a table first");
       return;
     }
 
-    console.log("Selected Table:", selectedTable);
+    setSelectedTable(selectedTableLocal);
+    setLoadTable(true);
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[200px] bg-gradient-to-br from-gray-100 to-gray-200 p-6 rounded-2xl shadow-lg w-full max-w-md mx-auto">
       
+      {/* Title */}
       <h2 className="text-xl font-semibold mb-4 text-gray-700 tracking-wide">
         Select Table
       </h2>
 
+      {/* Dropdown + Button */}
       <div className="flex gap-3 w-full">
-        
+
         {/* Dropdown */}
         <select
-          value={selectedTable}
-          onChange={(e) => setSelectedTable(e.target.value)}
+          value={selectedTableLocal}
+          onChange={(e) => setSelectedTableLocal(e.target.value)}
+          disabled={loading}
           className={`flex-1 px-4 py-2 rounded-xl border transition-all duration-200
             ${
-              selectedTable
+              selectedTableLocal
                 ? "border-blue-400 text-gray-800"
                 : "border-gray-300 text-gray-400"
             }
             focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm`}
         >
-          {/* Placeholder */}
           <option value="" disabled>
-            Select data
+            {loading ? "Loading tables..." : "Select data"}
           </option>
 
           {tables.map((table, index) => (
@@ -55,17 +68,18 @@ function TableSelector() {
           ))}
         </select>
 
-        {/* Button */}
+        {/* Load Button */}
         <button
-          onClick={handleClick}
-          className="px-5 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-md"
+          onClick={handleLoad}
+          disabled={loading}
+          className="px-5 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-md disabled:opacity-50"
         >
           Load
         </button>
       </div>
 
-      {/* Optional helper text */}
-      {!selectedTable && (
+      {/* Helper text */}
+      {!selectedTableLocal && !loading && (
         <p className="text-sm text-gray-500 mt-3">
           Please select a table to continue
         </p>

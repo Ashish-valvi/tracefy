@@ -4,6 +4,7 @@ const registerDBHandlers = require("./ipc/dbHandlers.cjs");
 const registerFileHandlers = require("./ipc/fileHandlers.cjs");
 const registerCSVHandlers = require("./ipc/csvHandlers.cjs");
 const {getTableList} = require("./ipc/tableList.cjs")
+const tableHandle = require("./ipc/tableHandle.cjs")
 
 
 
@@ -17,5 +18,6 @@ app.whenReady().then(() => {
   registerFileHandlers();
   registerCSVHandlers();
   getTableList();
+  tableHandle();
 });
 

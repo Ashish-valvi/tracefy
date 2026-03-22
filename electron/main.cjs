@@ -3,6 +3,7 @@ const createWindow = require("./windows/createWindow.cjs");
 const registerDBHandlers = require("./ipc/dbHandlers.cjs");
 const registerFileHandlers = require("./ipc/fileHandlers.cjs");
 const registerCSVHandlers = require("./ipc/csvHandlers.cjs");
+const {getTableList} = require("./ipc/tableList.cjs")
 
 
 
@@ -15,5 +16,6 @@ app.whenReady().then(() => {
   registerDBHandlers();
   registerFileHandlers();
   registerCSVHandlers();
+  getTableList();
 });
 

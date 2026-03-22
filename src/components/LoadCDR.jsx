@@ -4,6 +4,9 @@ function LoadCDR() {
     const [dragActive, setDragActive] = useState(false);
     const [file, setFile] = useState(null);
     const inputRef = useRef(null);
+    const [filePath, setFilePath] = useState("");
+    const [message, setMessage] = useState("");
+   const [loading, setLoading] = useState(false);
 
     // Handle drag events
     const handleDrag = (e) => {
@@ -36,15 +39,47 @@ function LoadCDR() {
 
     const validateAndSetFile = (selectedFile) => {
         if (selectedFile.name.endsWith('.csv')) {
+            console.log(selectedFile)
             setFile(selectedFile);
         } else {
             alert("Please upload a valid CSV file.");
         }
     };
 
-    const onButtonClick = () => {
-        inputRef.current.click();
+    const  onButtonClick = async () => {
+
+        const path = await window.api.selectFile();
+
+           if (path) {
+            setFilePath(path);
+           setMessage("📂 Selected: " + path);
+           }
+
+        // inputRef.current.click();
     };
+
+
+    // saving file to database
+const handleFiletoDB = async () => {
+    if (!filePath) {
+      setMessage("❌ Please select a file");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("⏳ Processing...");
+
+      const result = await window.api.createDB(filePath);
+
+      setMessage(result);
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ Error: " + error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     return (<>
     <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-2xl shadow-xl border border-gray-100">
@@ -93,12 +128,12 @@ function LoadCDR() {
             <h1>TestS</h1>
 
             {/* Action Footer */}
-            {file && (
+            {filePath && (
                 <div className="mt-6 flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
-                    <span className="text-green-700 text-sm font-medium">Ready to process: {file.name}</span>
+                    <span className="text-green-700 text-sm font-medium">Ready to process: {filePath}</span>
                     <button 
                         className="text-red-500 hover:text-red-700 text-sm font-bold"
-                        onClick={() => setFile(null)}
+                        onClick={() => setFilePath(null)}
                     >
                         Remove
                     </button>
@@ -109,12 +144,14 @@ function LoadCDR() {
            
         </div>
         <div>
-           <button 
+                <button 
+                    onClick={handleFiletoDB}
                     type="submit" 
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl mt-4 transition-all shadow-md active:scale-95"
+                    className="w-36 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl mt-4 transition-all shadow-md active:scale-95"
                 >
                     Load to DB
                 </button>
+                <h1>{message}</h1>
         </div>
     </>
         
@@ -123,3 +160,40 @@ function LoadCDR() {
 }
 
 export default LoadCDR;
+
+
+
+
+//  // ✅ Open file dialog
+//   const handleSelectFile = async () => {
+//     const path = await window.api.selectFile();
+
+//     if (path) {
+//       setFilePath(path);
+//       setMessage("📂 Selected: " + path);
+//     }
+//   };
+
+
+// selectFile: () => ipcRenderer.invoke("select-file"),
+
+
+  // registerFileHandlers();
+
+
+
+//   const { ipcMain, dialog } = require("electron");
+
+// function registerFileHandlers() {
+//   ipcMain.handle("select-file", async () => {
+//     const result = await dialog.showOpenDialog({
+//       properties: ["openFile"],
+//       filters: [{ name: "CSV Files", extensions: ["csv"] }],
+//     });
+
+//     if (result.canceled) return null;
+//     return result.filePaths[0];
+//   });
+// }
+
+// module.exports = registerFileHandlers;

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const csv = require("fast-csv");
 const { getDB } = require("./database.cjs");
+const { HeaderObject } = require("../../src/components/extraData");
 
 const BATCH_SIZE = 500;
 
@@ -15,27 +16,48 @@ function processCSV(filePath) {
     let tableName = "";
     let batch = [];
     let dataStartLine = null;
+    let columnIndexMap = {}; // 🔥 important
 
     const db = getDB();
 
-    // STEP 1: Find header & data start
+    // 🔧 Normalize function (important for matching)
+    const normalize = (str) =>
+      str?.toString().toLowerCase().trim();
+
+    // =========================
+    // STEP 1: Find header + mapping
+    // =========================
     fs.createReadStream(filePath)
       .pipe(csv.parse({ headers: false }))
       .on("data", (row) => {
         lineNumber++;
 
+        // 👉 Detect header row
         if (
           header.length === 0 &&
           row.includes("Type of Connection") &&
           row.includes("Call date")
         ) {
-          header = row.map((h, i) =>
-            !h
-              ? `column_${i}`
-              : h.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")
-          );
+          const csvHeaderRow = row.map(col => normalize(col));
+
+          // use manual headers
+          header = Object.keys(HeaderObject);
+
+          // 🔥 Create column index map
+          header.forEach((key) => {
+            const possibleNames = HeaderObject[key].map(n => normalize(n));
+
+            const index = csvHeaderRow.findIndex(col =>
+              possibleNames.includes(col)
+            );
+
+            columnIndexMap[key] = index;
+          });
+
+          console.log("✅ Column Mapping:", columnIndexMap);
         }
 
+        // 👉 Detect data start
         if (header.length > 0 && !dataStartLine && row[0]?.length === 12) {
           tableName = "cdr_" + row[0].replace(/[^a-zA-Z0-9]/g, "");
           dataStartLine = lineNumber;
@@ -45,42 +67,62 @@ function processCSV(filePath) {
         if (!dataStartLine) return reject("❌ Data start not found");
 
         createTableAndInsert();
-      });
+      })
+      .on("error", reject);
 
+    // =========================
+    // STEP 2: Create Table
+    // =========================
     function createTableAndInsert() {
       db.serialize(() => {
         db.run(`DROP TABLE IF EXISTS \`${tableName}\``);
 
         const columns = header.map(h => `\`${h}\` TEXT`).join(", ");
 
-        db.run(`
+        db.run(
+          `
           CREATE TABLE \`${tableName}\` (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ${columns}
           )
-        `, startInsert);
+        `,
+          startInsert
+        );
       });
     }
 
+    // =========================
+    // STEP 3: Read Data + Batch Insert
+    // =========================
     function startInsert() {
       let line = 0;
 
       fs.createReadStream(filePath)
-        .pipe(csv.parse({ headers: header }))
+        .pipe(csv.parse({ headers: false })) // 🔥 important
         .on("data", (row) => {
           line++;
-          if (line < dataStartLine) return;
+
+          if (line <= dataStartLine) return;
 
           batch.push(row);
-          if (batch.length === BATCH_SIZE) insertBatch();
+
+          if (batch.length === BATCH_SIZE) {
+            insertBatch();
+          }
         })
         .on("end", () => {
           insertBatch();
-          db.close();
+          db.close((err) => {
+            if (err) console.error(err);
+          });
           resolve("✅ DB Created Successfully");
-        });
+        })
+        .on("error", reject);
     }
 
+    // =========================
+    // STEP 4: Insert Batch
+    // =========================
     function insertBatch() {
       if (batch.length === 0) return;
 
@@ -96,7 +138,14 @@ function processCSV(filePath) {
         `);
 
         batch.forEach(row => {
-          const values = header.map(h => row[h] || null);
+          const values = header.map(h => {
+            const index = columnIndexMap[h];
+
+            if (index === -1 || index === undefined) return null;
+
+            return row[index] || null;
+          });
+
           stmt.run(values);
         });
 
@@ -110,3 +159,123 @@ function processCSV(filePath) {
 }
 
 module.exports = { processCSV };
+
+
+
+
+
+// ---------------------------------------------------------------------------------------
+
+// const fs = require("fs");
+// const csv = require("fast-csv");
+// const { getDB } = require("./database.cjs");
+// // const { HeaderObject } = require("../../src/components/extraData");
+
+// const BATCH_SIZE = 500;
+
+// function processCSV(filePath) {
+//   return new Promise((resolve, reject) => {
+//     if (!fs.existsSync(filePath)) {
+//       return reject("❌ File not found");
+//     }
+
+//     let lineNumber = 0;
+//     let header = [];
+//     let tableName = "";
+//     let batch = [];
+//     let dataStartLine = null;
+
+//     const db = getDB();
+
+//     // STEP 1: Find header & data start
+//     fs.createReadStream(filePath)
+//       .pipe(csv.parse({ headers: false }))
+//       .on("data", (row) => {
+//         lineNumber++;
+
+//         if (
+//           header.length === 0 &&
+//           row.includes("Type of Connection") &&
+//           row.includes("Call date")
+//         ) {
+//           header = row.map((h, i) =>
+//             !h
+//               ? `column_${i}`
+//               : h.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")
+//           );
+//         }
+
+//         if (header.length > 0 && !dataStartLine && row[0]?.length === 12) {
+//           tableName = "cdr_" + row[0].replace(/[^a-zA-Z0-9]/g, "");
+//           dataStartLine = lineNumber;
+//         }
+//       })
+//       .on("end", () => {
+//         if (!dataStartLine) return reject("❌ Data start not found");
+
+//         createTableAndInsert();
+//       });
+
+//     function createTableAndInsert() {
+//       db.serialize(() => {
+//         db.run(`DROP TABLE IF EXISTS \`${tableName}\``);
+
+//         const columns = header.map(h => `\`${h}\` TEXT`).join(", ");
+
+//         db.run(`
+//           CREATE TABLE \`${tableName}\` (
+//             id INTEGER PRIMARY KEY AUTOINCREMENT,
+//             ${columns}
+//           )
+//         `, startInsert);
+//       });
+//     }
+
+//     function startInsert() {
+//       let line = 0;
+
+//       fs.createReadStream(filePath)
+//         .pipe(csv.parse({ headers: header }))
+//         .on("data", (row) => {
+//           line++;
+//           if (line < dataStartLine) return;
+
+//           batch.push(row);
+//           if (batch.length === BATCH_SIZE) insertBatch();
+//         })
+//         .on("end", () => {
+//           insertBatch();
+//           db.close();
+//           resolve("✅ DB Created Successfully");
+//         });
+//     }
+
+//     function insertBatch() {
+//       if (batch.length === 0) return;
+
+//       db.serialize(() => {
+//         db.run("BEGIN TRANSACTION");
+
+//         const columns = header.map(h => `\`${h}\``).join(", ");
+//         const placeholders = header.map(() => "?").join(", ");
+
+//         const stmt = db.prepare(`
+//           INSERT INTO \`${tableName}\` (${columns})
+//           VALUES (${placeholders})
+//         `);
+
+//         batch.forEach(row => {
+//           const values = header.map(h => row[h] || null);
+//           stmt.run(values);
+//         });
+
+//         stmt.finalize();
+//         db.run("COMMIT");
+//       });
+
+//       batch = [];
+//     }
+//   });
+// }
+
+// module.exports = { processCSV };

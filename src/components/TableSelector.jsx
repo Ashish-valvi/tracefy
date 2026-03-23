@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
-function TableSelector({ setSelectedTable, setLoadTable }) {
+function TableSelector({ setSelectedTable, setLoadTable, onLoad }) {
   const [tables, setTables] = useState([]);
-  const [selectedTableLocal, setSelectedTableLocal] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTable, setActiveTable] = useState("");
 
-  // Fetch tables from backend
+  // 🔥 Fetch tables
   useEffect(() => {
     const fetchTables = async () => {
       try {
@@ -22,67 +22,74 @@ function TableSelector({ setSelectedTable, setLoadTable }) {
     fetchTables();
   }, []);
 
-  // Load button click
-  const handleLoad = () => {
-    if (!selectedTableLocal) {
-      alert("⚠️ Please select a table first");
-      return;
-    }
-
-    setSelectedTable(selectedTableLocal);
+  // 🔥 Load table
+  const handleLoad = (table) => {
+    setActiveTable(table);
+    setSelectedTable(table);
     setLoadTable(true);
+
+    if (onLoad) onLoad(); // ✅ hides selector
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[200px] bg-gradient-to-br from-gray-100 to-gray-200 p-6 rounded-2xl shadow-lg w-full max-w-md mx-auto">
-      
+    <div className="max-w-3xl mx-auto mt-6 p-6 bg-white rounded-2xl shadow-lg border border-gray-200">
+
       {/* Title */}
-      <h2 className="text-xl font-semibold mb-4 text-gray-700 tracking-wide">
+      <h2 className="text-xl font-semibold text-gray-800 mb-5">
         Select Table
       </h2>
 
-      {/* Dropdown + Button */}
-      <div className="flex gap-3 w-full">
+      {/* Loading */}
+      {loading && (
+        <div className="text-center text-gray-500 py-6 animate-pulse">
+          Loading tables...
+        </div>
+      )}
 
-        {/* Dropdown */}
-        <select
-          value={selectedTableLocal}
-          onChange={(e) => setSelectedTableLocal(e.target.value)}
-          disabled={loading}
-          className={`flex-1 px-4 py-2 rounded-xl border transition-all duration-200
-            ${
-              selectedTableLocal
-                ? "border-blue-400 text-gray-800"
-                : "border-gray-300 text-gray-400"
-            }
-            focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm`}
-        >
-          <option value="" disabled>
-            {loading ? "Loading tables..." : "Select data"}
-          </option>
+      {/* Table List */}
+      {!loading && (
+        <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-2">
 
-          {tables.map((table, index) => (
-            <option key={index} value={table}>
-              {table}
-            </option>
-          ))}
-        </select>
+          {tables.map((table, index) => {
+            const isActive = activeTable === table;
 
-        {/* Load Button */}
-        <button
-          onClick={handleLoad}
-          disabled={loading}
-          className="px-5 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-md disabled:opacity-50"
-        >
-          Load
-        </button>
-      </div>
+            return (
+              <div
+                key={index}
+                className={`flex justify-between items-center p-4 rounded-xl border transition-all duration-200 ${
+                  isActive
+                    ? "bg-blue-50 border-blue-400 shadow-sm"
+                    : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                {/* Table Name */}
+                <div className="text-sm font-medium text-gray-700 truncate">
+                  {table}
+                </div>
 
-      {/* Helper text */}
-      {!selectedTableLocal && !loading && (
-        <p className="text-sm text-gray-500 mt-3">
-          Please select a table to continue
-        </p>
+                {/* Load Button */}
+                <button
+                  onClick={() => handleLoad(table)}
+                  disabled={loading}
+                  className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-all ${
+                    isActive
+                      ? "bg-green-600 text-white"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  } disabled:opacity-50`}
+                >
+                  {isActive ? "Loaded" : "Load"}
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Empty state */}
+          {tables.length === 0 && (
+            <div className="text-center text-gray-500 py-6">
+              No tables found
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
